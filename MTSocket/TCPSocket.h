@@ -14,7 +14,7 @@ typedef struct {
     struct sockaddr_in serverAddr;
     struct sockaddr_in peerAddr;
     int sockFd;
-}TCPSocket;
+} TCPSocket;
 
 TCPSocket* tcp_server_create(int port);
 TCPSocket* tcp_clent_create(char* peerIP, int port);

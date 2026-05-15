@@ -22,11 +22,11 @@ void print_instructions()
 }
 
 void initClient(Client* cli) {
-    cli->client_sock = NULL;
+    cli->client_sock = NULL;	// lý do ko cấp phát
     cli->connectionStatus = false;
     cli->isLoggedIn = false;
     cli->isInSession = false;
-    cli->mthread = (MThread*)malloc(sizeof(MThread));
+    cli->mthread = (MThread*)malloc(sizeof(MThread));	// lý do cấp phát (làm cái gì và các hàm nào lưu thông tin vào cho struct đó, nếu ko cấp phát vùng nhớ thì truy cập vào các member sẽ ko hợp lệ --> segmentation default)
 	cli->partner = (Partner*)malloc(sizeof(Partner));
 	cli->peer = (Peer2Peer*)malloc(sizeof(Peer2Peer));
 }
@@ -38,7 +38,7 @@ void run_client(void* arg) {
         return;
     }
 
-    printf("run client\n");
+    printf("client running ...\n");
     int command;
 
     while (cli->connectionStatus)
@@ -77,8 +77,8 @@ void run_client(void* arg) {
 	}
 }
 
-bool connectToServer(Client* cli, MThread* mthrd, char* serverIp, int serverPort) {
-    if (cli == NULL || mthrd == NULL) {
+bool connectToServer(Client* cli, char* serverIp, int serverPort) {
+    if (cli == NULL || cli->mthread == NULL) {
         return false;
     }
     cli->client_sock = tcp_clent_create(serverIp, serverPort);
@@ -88,37 +88,46 @@ bool connectToServer(Client* cli, MThread* mthrd, char* serverIp, int serverPort
     }
     else {
         cli->connectionStatus = true;
-        mthrd->run = run_client;
-        mthrd->arg = (void*)cli;
-        mt_start(mthrd);
+        cli->mthread->run = run_client;
+        cli->mthread->arg = (void*)cli;
+        mt_start(cli->mthread);
     }
     return true;
 }
 
-void login(TCPSocket* socktowrite, char* name, char* pass) {
-    writeCommand(socktowrite, LOGIN);
-	writeMsg(socktowrite, name);
-	writeMsg(socktowrite, pass);
+void login(Client* cli, char* name, char* pass) {
+	if (cli == NULL || cli->client_sock == NULL || name == NULL || pass == NULL) {
+        return;
+    }
+    writeCommand(cli->client_sock, LOGIN);
+	writeMsg(cli->client_sock, name);
+	writeMsg(cli->client_sock, pass);
 }
 
-void signup(TCPSocket* socktowrite, char* name, char* pass) {
-    writeCommand(socktowrite, SIGNUP);
-	writeMsg(socktowrite, name);
-	writeMsg(socktowrite, pass);
+void signup(Client* cli, char* name, char* pass) {
+	if (cli == NULL || cli->client_sock == NULL || name == NULL || pass == NULL) {
+        return;
+    }
+    writeCommand(cli->client_sock, SIGNUP);
+	writeMsg(cli->client_sock, name);
+	writeMsg(cli->client_sock, pass);
 }
 
-void openSession(TCPSocket* socktowrite, char* username, char* peerUsr) {
-	writeCommand(socktowrite, OPEN_SESSION_WITH_USER);
-	writeMsg(socktowrite, username);
-	writeMsg(socktowrite, peerUsr);
+void openSession(Client* cli, char* username, char* peerUsr) {
+	if (cli == NULL || cli->client_sock == NULL || username == NULL || peerUsr == NULL) {
+        return;
+    }
+	writeCommand(cli->client_sock, OPEN_SESSION_WITH_USER);
+	writeMsg(cli->client_sock, username);
+	writeMsg(cli->client_sock, peerUsr);
 }
 
-void listAllUsers(TCPSocket* socktowrite) {
-	writeCommand(socktowrite, GET_ALL_CONNECTED_USERS);
+void listAllUsers(Client* cli) {
+	writeCommand(cli->client_sock, GET_ALL_CONNECTED_USERS);
 }
 
-void getUsers(TCPSocket* socktowrite) {
-	writeCommand(socktowrite, GET_ALL_USERS);
+void getUsers(Client* cli) {
+	writeCommand(cli->client_sock, GET_ALL_USERS);
 }
 
 clearPartner(Client* cli) {
@@ -132,6 +141,9 @@ clearPartner(Client* cli) {
 }
 
 void gotIpAndPort(Client* cli) {
+	if (cli == NULL || cli->partner == NULL || cli->client_sock == NULL) {
+		return;
+	}
 	char* msg;
 	char* name;
 	char *port;
@@ -159,6 +171,9 @@ void gotIpAndPort(Client* cli) {
 }
 
 void gotIncomingSession(Client* cli) {
+	if (cli == NULL || cli->partner == NULL || cli->client_sock == NULL) {
+		return;
+	}
 	char *msg, *name;
 	char *port;
 	char *token;
@@ -190,6 +205,9 @@ void closeSession(Client* cli) {
 }
 
 void loggedIn(Client* cli) {	
+	if (cli == NULL || cli->client_sock == NULL || cli->peer == NULL) {
+        return;
+    }
 	char *msg, *name;
 	int int_port;
 	char *token;
@@ -205,7 +223,7 @@ void loggedIn(Client* cli) {
 }
 
 void sendMsgToSession(Client* cli, char* msg) {
-	if(cli == NULL || msg == NULL || cli->peer == NULL || cli->partner->ip == NULL || cli->client_name == NULL) return;
+	if(cli == NULL || msg == NULL || cli->partner->ip == NULL || cli->client_name == NULL) return;
 	 
 	if (cli->isInSession == true) {
 		char buffer[1024];

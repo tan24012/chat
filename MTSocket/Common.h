@@ -1,6 +1,9 @@
 #include "TCPSocket.h"
 
 static int readCommand(TCPSocket* socktoread) {
+	if (socktoread == NULL) {
+		return;
+	}
 	int messagelength = 0, recived = 0;
 	recived = recv_msg(socktoread->sockFd, (char*)&messagelength, 4);
 	if(!(recived==4))
@@ -9,11 +12,17 @@ static int readCommand(TCPSocket* socktoread) {
 }
 
 static void writeCommand(TCPSocket* socktowrite, int command) {
+	if (socktoread == NULL) {
+		return;
+	}
 	int msglen = htonl((uint32_t)command);
 	send_msg(socktowrite->sockFd, (char*)&msglen, 4);
 }
 
 static void writeMsg(TCPSocket* socktowrite, char* msg) {
+	if (socktowrite == NULL || msg == NULL) {
+		return;
+	}
 	//send msg length
 	int msglen = htonl((uint32_t) strlen(msg));
 	send_msg(socktowrite->sockFd, (char*)&msglen,4);

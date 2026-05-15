@@ -21,7 +21,7 @@ int main(int argc, char* argv[]) {
 
         if(strcmp(command, "c") == 0) {
             if(cli.connectionStatus == false) {
-                if (!connectToServer(&cli, cli.mthread, SERVER_IP, SERVER_PORT))
+                if (!connectToServer(&cli, SERVER_IP, SERVER_PORT))
                     printf("connect failed\n");
                 else 
                     printf("connected to %s:%d\n", SERVER_IP, SERVER_PORT);
@@ -40,7 +40,7 @@ int main(int argc, char* argv[]) {
 				continue;
 			}
 			else if(cli.isLoggedIn==false) {
-				login(cli.client_sock, username, password);
+				login(&cli, username, password);
 				//sleep(5);
 			}
 			else
@@ -57,7 +57,7 @@ int main(int argc, char* argv[]) {
 				continue;
 			}
 			
-			signup(cli.client_sock, username, password);
+			signup(&cli, username, password);
 		}
         else if (strcmp(command, "o") == 0) {
 			printf("enter peer name: ");
@@ -72,7 +72,7 @@ int main(int argc, char* argv[]) {
 				continue;
 			}
 			else {
-				openSession(cli.client_sock, username, peerUsr);
+				openSession(&cli, username, peerUsr);
 			}
 		}
         else if (strcmp(command, "cs") == 0) 

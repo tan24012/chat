@@ -1,5 +1,3 @@
-
-
 #include "Peer2Peer.h"
 
 void initPeer2Peer(Peer2Peer* peer, int _port) {
@@ -29,10 +27,9 @@ void runPeer2Peer(void *arg) {
 }
 
 void sendTo_udp(Peer2Peer* peer, char* msg, char* ip, int port) {
-	if(peer->udp_socket == NULL) return;
+	if(peer == NULL || msg == NULL || ip == NULL) return;
 	printf("send to ip: %s\n", ip);
 	printf("send to port: %d\n", port);
-	printf("size of message: %d\n", sizeof(msg));
 		
 	int num;
 	num = sendTo(peer->udp_socket, msg, ip, port);

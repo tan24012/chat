@@ -8,10 +8,9 @@ typedef struct {
     pthread_t threadId;
     void (*run)(void*);
     void* arg;
-}MThread;
+} MThread;
 
 int mt_start(MThread *t);
-
 int mt_wait(MThread *t);
 
 #endif

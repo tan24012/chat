@@ -3,8 +3,6 @@
 #ifndef LOGINANDSIGNUP_H_
 #define LOGINANDSIGNUP_H_
 
-#define LOGIN_OR_SIGNUP 			42
-
 #include <stdbool.h>
 
 #include "Dispatcher.h"
@@ -20,7 +18,6 @@ typedef struct {
     int peers_count;    // số lượng TCPSocket trong mảng peers
     MThread* mthread;   // thread để xử lý login/sign-up
     bool status;    // dừng/tiếp tục thread
-
 } LoginAndSignUp;
 
 void initLoginAndSignUp(LoginAndSignUp* loginAndSign);   // Khởi tạo LoginAndSignUp
