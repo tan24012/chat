@@ -45,7 +45,7 @@ int sendTo(UDPSocket* udpSocket, char* msg, char* ip, int port){
 }
 
 void ccloseUdp(UDPSocket* udpSocket) {
-	cout<<"closing udp socket .."<<endl;
+	printf("closing udp socket ..\n");
 	shutdown(udpSocket->socket_fd, SHUT_RDWR);
 	close(udpSocket->socket_fd);
 }

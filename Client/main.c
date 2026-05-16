@@ -109,12 +109,12 @@ int main(int argc, char* argv[]) {
 		}
 		else if (strcmp(command, "d") == 0) //disconnect from server
 		{
-			if (cli.isConnectedToServer == false)
+			if (cli.connectionStatus == false)
 			{
-				cout << "ERROR - You are not connected to a server" <<  endl;
+				printf("ERROR - You are not connected to a server\n");
 				continue;
 			}
-			cout<<"Disconnecting Server..."<<endl;
+			printf("Disconnecting Server...\n");
 			disconnectFromServer(&cli);
 		}
 		else if (strcmp(command, "x") == 0) //disconnect from server
@@ -122,8 +122,6 @@ int main(int argc, char* argv[]) {
 			closeApp(&cli);
 		}
     } while(strcmp(command, "x") != 0);
-
-    mt_wait(cli.mthread);
 
     return 0;
 }

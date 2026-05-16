@@ -41,11 +41,11 @@ void sendTo_udp(Peer2Peer* peer, char* msg, char* ip, int port) {
 }
 
 void cclosePeer(Peer2Peer* peer) {
-	cli->peer->running = false;	// thread peer dừng
+	peer->running = false;	// thread peer dừng
 	ccloseUdp(peer->udp_socket);	// close udp socket
 	mt_wait(peer->mthread);		// free thread
-	free(cli->peer->mthread);
-	cli->peer->mthread = NULL;
+	free(peer->mthread);
+	peer->mthread = NULL;
 	free(peer->udp_socket);
 	peer->udp_socket = NULL;
 }

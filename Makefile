@@ -1,5 +1,5 @@
 CC := gcc
-CFLAGS := -Wall -Wextra -g
+CFLAGS := -Wall -Wextra -g -fsanitize=address -fno-omit-frame-pointer
 CPPFLAGS := -I./MTSocket -I./Client -I./Server
 LDLIBS := -pthread
 
@@ -37,10 +37,10 @@ OBJS_SERVER := $(SRCS_SERVER:%.c=$(BUILD_DIR)/%.o)
 all: $(TARGET_CLIENT) $(TARGET_SERVER)
 
 $(TARGET_CLIENT): $(OBJS_CLIENT)
-	$(CC) $^ -o $@ $(LDLIBS)
+	$(CC) $^ -o $@ $(LDLIBS) $(CFLAGS)
 
 $(TARGET_SERVER): $(OBJS_SERVER)
-	$(CC) $^ -o $@ $(LDLIBS)
+	$(CC) $^ -o $@ $(LDLIBS) $(CFLAGS)
 
 $(BUILD_DIR)/%.o: %.c
 	mkdir -p $(dir $@)
@@ -50,7 +50,7 @@ run-client: $(TARGET_CLIENT)
 	./$(TARGET_CLIENT)
 
 run-server: $(TARGET_SERVER)
-	./$(TARGET_SERVER) 
+	./$(TARGET_SERVER)
 
 clean:
 	rm -rf $(BUILD_DIR)

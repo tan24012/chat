@@ -130,7 +130,7 @@ char* destIpAndPort(TCPSocket* s){
 }
 
 void cclose(TCPSocket* s) {
-	cout<<"closing socket"<<endl;
-	shutdown(s->socket_fd,SHUT_RDWR);
-	close(s->socket_fd);
+	printf("closing socket\n");
+	shutdown(s->sockFd,SHUT_RDWR);
+	close(s->sockFd);
 }
