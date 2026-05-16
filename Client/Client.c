@@ -216,8 +216,9 @@ void loggedIn(Client* cli) {
 	msg = readMsg(cli->client_sock); 	
 	token = strtok(msg, ":");
 	token = strtok(NULL, ":");
-
 	int_port = atoi(token);
+	free(msg);
+
 	cli->isLoggedIn = true;
 	initPeer2Peer(cli->peer, int_port);
 }
