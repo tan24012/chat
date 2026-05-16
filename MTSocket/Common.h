@@ -12,7 +12,7 @@ static int readCommand(TCPSocket* socktoread) {
 }
 
 static void writeCommand(TCPSocket* socktowrite, int command) {
-	if (socktoread == NULL) {
+	if (socktowrite == NULL) {
 		return;
 	}
 	int msglen = htonl((uint32_t)command);
