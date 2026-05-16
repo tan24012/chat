@@ -41,5 +41,7 @@ void gotIncomingSession(Client* cli); // nhận tên, ip & port từ server khi 
 void clearPartner(Client* cli); // xóa thông tin partner 
 void loggedIn(Client* cli);
 void sendMsgToSession(Client* cli, char* msg);
+void disconnectFromServer(Client* cli);
+void closeApp(&cli);
 
 #endif

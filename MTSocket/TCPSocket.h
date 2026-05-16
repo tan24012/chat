@@ -22,5 +22,6 @@ TCPSocket* listenAndAccept(TCPSocket* s);
 int send_msg(int sockFd, const char* msg, int len);
 int recv_msg(int sockFd, char* buffer, int len);
 char* destIpAndPort(TCPSocket* s);  // Trả về chuỗi "IP:port" của peer socket
+void cclose(TCPSocket* s);
 
 #endif

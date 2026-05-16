@@ -17,7 +17,7 @@ typedef struct {
 UDPSocket* create_UDPSocket(int port);
 int recv_msg_udp(UDPSocket* udpSocket, char* buffer, int length);
 int sendTo(UDPSocket* udpSocket, char* msg, char* ip, int port);
-void cclose();
+void ccloseUdp(UDPSocket* udpSocket);
 char* fromAddr();
 
 #endif /* UDPSOCKET_H_ */

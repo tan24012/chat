@@ -17,3 +17,4 @@ int mt_start(MThread *t) {
 int mt_wait(MThread *t) {
     return pthread_join(t->threadId, NULL);
 }
+

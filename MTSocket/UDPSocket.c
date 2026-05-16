@@ -44,15 +44,11 @@ int sendTo(UDPSocket* udpSocket, char* msg, char* ip, int port){
 	return sendto(udpSocket->socket_fd, msg, strlen(msg), 0, (struct sockaddr *)&toAddr, sizeof(toAddr));
 }
 
-// void UDPSocket::cclose(){
-// 	cout<<"closing udp socket .."<<endl;
-// 	shutdown(socket_fd,SHUT_RDWR);
-// 	close(socket_fd);
-// }
-
-// string UDPSocket::fromAddr(){
-// 	return inet_ntoa(from.sin_addr);
-// }
+void ccloseUdp(UDPSocket* udpSocket) {
+	cout<<"closing udp socket .."<<endl;
+	shutdown(udpSocket->socket_fd, SHUT_RDWR);
+	close(udpSocket->socket_fd);
+}
 
 
 

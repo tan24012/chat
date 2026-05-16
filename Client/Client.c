@@ -10,15 +10,16 @@ void print_instructions()
 	printf("%s%s\n","\nc <ip> - connect to serapp\n");
 	printf("%s%s\n","login <username> <password> - Login to serapp\n");
 	printf("%s%s\n","register <username> <password> - Signup to server\n");
-	printf("%s%s\n","lu - print all users from serapp\n");
-	printf("%s%s\n","lcu - print all connected users from serapp\n");
 	printf("%s%s\n","o <username> - open a session with a uapp\n");
 	printf("%s%s\n","cs - close the current sessapp\n");
-	printf("%s%s\n","s <message> - send a message to session uapp\n");
-	printf("%s%s\n","l - print connection staapp\n");
 	printf("%s%s\n","d - disconnect from serapp\n");
-	printf("%s%s\n","p - print instructiapp\n");
+	printf("%s%s\n","s <message> - send a message to session uapp\n");
 	printf("%s%s\n","x - close app\n");
+	printf("%s%s\n","l - print connection staapp\n");
+	printf("%s%s\n","p - print instructiapp\n");
+	printf("%s%s\n","lu - print all users from serapp\n");
+	printf("%s%s\n","lcu - print all connected users from serapp\n");
+	
 }
 
 void initClient(Client* cli) {
@@ -234,4 +235,50 @@ void sendMsgToSession(Client* cli, char* msg) {
 	else {
 		printf("You don't have an open session\n"); 
 	}
+}
+
+void disconnectFromServer(Client* cli) {
+	if(cli == NULL || cli->client_sock == NULL) return;
+
+	if(cli->isLoggedIn == true) {
+		free(cli->client_name);
+		cli->client_name = NULL;
+
+		cclosePeer(cli->peer);	// đóng peer
+
+		cli->isLoggedIn == false;
+	}
+
+	if(cli->isInSession == true) {
+		clearPartner(cli);
+		cli->isInSession = false;
+	}
+
+	cli->connectionStatus = false;	// dừng thread
+	writeCommand(cli->client_sock, EXIT);
+	cclose(cli->client_sock);
+	mt_wait(cli->mthread);		
+	free(cli->client_sock);
+	cli->client_sock = NULL;
+}
+
+void closeApp(Client* cli) {
+	if (cli == NULL) return;
+	
+	if(cli->connectionStatus == true) {
+		disconnectFromServer(cli);
+	}
+	else {
+        cli->connectionStatus = false;
+        if (cli->mthread != NULL) {
+            mt_wait(cli->mthread);
+        }
+    }
+
+	free(cli->mthread);
+	cli->mthread = NULL;
+	free(cli->partner);
+	cli->partner = NULL;
+	free(cli->peer);
+	cli->peer = NULL;
 }
