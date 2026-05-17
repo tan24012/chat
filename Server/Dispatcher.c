@@ -138,6 +138,7 @@ void close_session(Dispatcher* dispatcher,  User* user)
 	bool userExist = false;
 
 	pthread_mutex_lock(&dispatcher->login_dispatcher_mutex);
+
 	for (int i=0; i<dispatcher->login_users_count; i++) {	// tìm Client muốn đóng session
 		_user = dispatcher->login_users[i];
 		if (user->socket == dispatcher->login_users[i]->socket) {
@@ -198,16 +199,17 @@ void user_exit(User* current_user) {
         }
     }
 	for (int i = index; i < dispatcher->login_users_sockets_count - 1; i++) {
-        dispatcher->login_users_sockets[i] = dispatcher->login_users[i + 1];
+        dispatcher->login_users_sockets[i] = dispatcher->login_users_sockets[i + 1];
     }
 	dispatcher->login_users_sockets_count--;
 
-	pthread_mutex_unlock(&dispatcher->login_dispatcher_mutex);
-	
 	if(user->connectedToUser != NULL) {
-		close_session(dispatcher, current_user);
+		user->connectedToUser->connectedToUser = NULL;
+		user->connectedToUser->connectionStatus = false;
 		writeCommand(user->connectedToUser->socket,SESSION_ENDED);
 	}
+
+	pthread_mutex_unlock(&dispatcher->login_dispatcher_mutex);
 
 	cclose(user->socket);
 	free(user->socket);
