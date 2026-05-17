@@ -37,3 +37,30 @@ void runServer(void* arg) {
 	}
 	printf("Server stopped running\n");
 }
+
+void closeServer(Server* serv) {
+    if (serv == NULL) {
+        return;
+    }
+
+    serv->status = false;
+
+    if (serv->listen_sock != NULL) {
+        shutdown(serv->listen_sock->sockFd, SHUT_RDWR);
+        close(serv->listen_sock->sockFd);
+    }
+
+    if (serv->mthread != NULL) {
+        mt_wait(serv->mthread);
+    }
+
+    closeLoginAndSignUp(serv->loginAndSign);
+    free(serv->loginAndSign);
+    serv->loginAndSign = NULL;
+
+    free(serv->listen_sock);
+    serv->listen_sock = NULL;
+
+    free(serv->mthread);
+    serv->mthread = NULL;
+}

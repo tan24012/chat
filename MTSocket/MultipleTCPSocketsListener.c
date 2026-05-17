@@ -9,10 +9,8 @@ TCPSocket* listenToSocket(MultipleTCPSocketsListener* listener, int count, int t
     int returned;
 
     // đưa các fd vào tập 
-	for (int i = 0; i < count; i++)
-	{
-		if (maxfd < listener->sockets[i]->sockFd)
-		{
+	for (int i = 0; i < count; i++) {
+		if (maxfd < listener->sockets[i]->sockFd) {
 			maxfd = listener->sockets[i]->sockFd;
 		}
 		FD_SET(listener->sockets[i]->sockFd, &fdset);

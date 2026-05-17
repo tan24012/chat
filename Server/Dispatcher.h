@@ -28,5 +28,7 @@ void add_all_users(Dispatcher* dispatcher, const char* username);   // Thêm use
 void open_session(Dispatcher* dispatcher, User* user);  // Xử lý yêu cầu mở session giữa 2 user
 void close_session(Dispatcher* dispatcher, User* user);  // Xử lý yêu cầu đóng session giữa 2 user
 void runDispatcher(void* arg);   // Hàm xử lý các request sau khi login/sign-up thành công
+void closeDispatcher(Dispatcher* dispatcher);
+void user_exit(current_user);
 
 #endif /* DISPATCHER_H_ */

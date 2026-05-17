@@ -6,19 +6,21 @@ void initLoginAndSignUp(LoginAndSignUp* loginAndSign) {
 
 	loginAndSign->dispatcher = (Dispatcher*)malloc(sizeof(Dispatcher));
 	initDispatcher(loginAndSign->dispatcher);
-	
 
     loginAndSign->peers_count = 0;
     loginAndSign->status = false;
+	pthread_mutex_init(&loginAndSign->peers_mutex, NULL);
 }
 
 void addPeer(LoginAndSignUp* loginAndSign, TCPSocket* peer) {
+	pthread_mutex_lock(&loginAndSign->peers_mutex);
     if (loginAndSign->peers_count < MAX_PEERS) {
         loginAndSign->peers[loginAndSign->peers_count] = peer;
         loginAndSign->peers_count++;
     } else {
         printf("Maximum number of peers reached. Cannot add more.\n");
     }
+	pthread_mutex_unlock(&loginAndSign->peers_mutex)
 
     if(loginAndSign->status == false) {
         loginAndSign->status = true;
@@ -92,6 +94,7 @@ bool signup(Dispatcher* dispatcher, char* username, char* password)
 }
 
 void remove_peer(LoginAndSignUp* loginAndSign, TCPSocket* peer) {
+	pthread_mutex_lock(&loginAndSign->peers_mutex);
     int index = -1;
 
     for (int i = 0; i < loginAndSign->peers_count; i++) {
@@ -111,6 +114,7 @@ void remove_peer(LoginAndSignUp* loginAndSign, TCPSocket* peer) {
 
     loginAndSign->peers_count--;
     loginAndSign->peers[loginAndSign->peers_count] = NULL;
+	pthread_mutex_unlock(&loginAndSign->peers_mutex)
 }
 
 void runLoginAndSignUp(void* arg) {
@@ -120,13 +124,16 @@ void runLoginAndSignUp(void* arg) {
     int command;
 	char* username;
 	char* password;
+	char* ipAndPort;
 
     while(loginAndSign->status == true) {
         TCPSocket* sockfd_ready;
 
         MultipleTCPSocketsListener* listener = (MultipleTCPSocketsListener*)malloc(sizeof(MultipleTCPSocketsListener));
-		memcpy(listener->sockets, loginAndSign->peers, loginAndSign->peers_count * sizeof(TCPSocket*));
-    
+		pthread_mutex_lock(&loginAndSign->peers_mutex);
+		memcpy(listener->sockets, loginAndSign->peers, loginAndSign->peers_count * sizeof(TCPSocket*));	 // copy pointer
+		pthread_mutex_unlock(&loginAndSign->peers_mutex)
+
         sockfd_ready = listenToSocket(listener, loginAndSign->peers_count, 2);
         free(listener);
 
@@ -143,13 +150,17 @@ void runLoginAndSignUp(void* arg) {
 		else if (command == LOGIN) {
 			username = readMsg(sockfd_ready);
 			password = readMsg(sockfd_ready);
+			ipAndPort = destIpAndPort(sockfd_ready)
 
 			if  (login(loginAndSign->dispatcher, username, password) == true) {
 				writeCommand(sockfd_ready, CONFIRM_USER);
 				writeMsg(sockfd_ready, username);
-				writeMsg(sockfd_ready, destIpAndPort(sockfd_ready));
+				writeMsg(sockfd_ready, ipAndPort);
 				add_user(loginAndSign->dispatcher, sockfd_ready, username);
 				remove_peer(loginAndSign, sockfd_ready);
+				free(username);
+				free(password);
+				free(ipAndPort);
 			}
 			else {
 				writeCommand(sockfd_ready,LOGIN_DENIED);
@@ -158,27 +169,90 @@ void runLoginAndSignUp(void* arg) {
 		else if (command == SIGNUP) {
 			username = readMsg(sockfd_ready);
 			password = readMsg(sockfd_ready);
+			ipAndPort = destIpAndPort(sockfd_ready)
 
 			if (signup(loginAndSign->dispatcher, username, password) == true) {
 				writeCommand(sockfd_ready,CONFIRM_USER);
 				writeMsg(sockfd_ready,username);
-				writeMsg(sockfd_ready, destIpAndPort(sockfd_ready));
+				writeMsg(sockfd_ready, ipAndPort);
 				add_user(loginAndSign->dispatcher, sockfd_ready, username);
 				add_all_users(loginAndSign->dispatcher, username);
 				remove_peer(loginAndSign, sockfd_ready);
+				free(username);
+				free(password);
+				free(ipAndPort);
 			}
 			else
 			{
 				writeCommand(sockfd_ready,USERNAME_TAKEN);
 			}
 		}
-		else
-		{
+		else if (command == EXIT) {
+			remove_peer(loginAndSign, sockfd_ready);
+			cclose(sockfd_ready);
+			free(sockfd_ready);
+		}
+		else {
 			writeCommand(sockfd_ready,BAD_COMMAND);
 		}
         
     }
-    
+}
 
+void notifyPendingClients(LoginAndSignUp* loginAndSign) {
+    if (loginAndSign == NULL) {
+        return;
+    }
 
+    pthread_mutex_lock(&loginAndSign->peers_mutex);
+
+    for (int i = 0; i < loginAndSign->peers_count; i++) {
+        TCPSocket* peer = loginAndSign->peers[i];
+
+        if (peer != NULL) {
+            writeCommand(peer, CLOSE_CONNECTION);
+        }
+    }
+
+    pthread_mutex_unlock(&loginAndSign->peers_mutex);
+}
+
+void closeLoginAndSignUp(LoginAndSignUp* loginAndSign) {
+    if (loginAndSign == NULL) {
+        return;
+    }
+
+	notifyPendingClients(loginAndSign);
+
+    loginAndSign->status = false;
+
+	pthread_mutex_lock(&loginAndSign->mutex);
+    for (int i = 0; i < loginAndSign->peers_count; i++) {
+        TCPSocket* peer = loginAndSign->peers[i];
+
+        if (peer != NULL) {
+            shutdown(peer->sockFd, SHUT_RDWR);
+            close(peer->sockFd);
+        }
+    }
+
+    if (loginAndSign->mthread != NULL && loginAndSign->status == true) {
+        mt_wait(loginAndSign->mthread);
+    }
+
+    for (int i = 0; i < loginAndSign->peers_count; i++) {
+        free(loginAndSign->peers[i]);
+        loginAndSign->peers[i] = NULL;
+    }
+	pthread_mutex_unlock(&loginAndSign->mutex);
+
+    loginAndSign->peers_count = 0;
+
+    closeDispatcher(loginAndSign->dispatcher);
+    free(loginAndSign->dispatcher);
+    loginAndSign->dispatcher = NULL;
+
+    free(loginAndSign->mthread);
+    loginAndSign->mthread = NULL;
+	pthread_mutex_destroy(&loginAndSign->peers_mutex);
 }

@@ -12,6 +12,7 @@
 #include "MultipleTCPSocketsListener.h"
 
 typedef struct {
+    pthread_mutex_t peers_mutex;
     TCPSocket* peers[MAX_PEERS];    // mảng lưu trữ các TCPSocket đc tạo ra từ accept() chưa login
     MultipleTCPSocketsListener* sockets; // chứa mảng lưu trữ các TCPSocket để lắng nghe request từ client
     Dispatcher* dispatcher;  // dispatcher để xử lý các request sau khi login/sign-up thành công
@@ -25,5 +26,6 @@ void addPeer(LoginAndSignUp* loginAndSign, TCPSocket* peer);    // Thêm các TC
 bool login(Dispatcher* dispatcher, char* username, char* password);   // check đúng user password ko
 void remove_peer(LoginAndSignUp* loginAndSign, TCPSocket* peer);    // Xóa TCPSocket khỏi mảng peers
 void runLoginAndSignUp(void* arg);   // Hàm xử lý login/sign-up cho các TCPSocket trong mảng peers
+void closeLoginAndSignUp(LoginAndSignUp* loginAndSign);
 
 #endif /* LOGINANDSIGNUP_H_ */

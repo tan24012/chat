@@ -19,5 +19,6 @@ typedef struct {
 
 void initServer(Server* serv);
 void runServer(void* arg);
+void closeServer(Server* serv);
 
 #endif

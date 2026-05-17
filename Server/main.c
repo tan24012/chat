@@ -4,5 +4,12 @@ int main() {
     Server server ;
 
     initServer(&server);
-    mt_wait(server.mthread);
+
+    do {
+        scanf("%s", command);
+
+        if(strcmp(command, "x") == 0) {
+            closeServer(&server);
+        }
+    } while(strcmp(command, "x") != 0);
 }

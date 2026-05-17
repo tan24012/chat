@@ -74,6 +74,14 @@ void run_client(void* arg) {
 				cli->isInSession = false;
 				clearPartner(cli);
 				break;
+			case OPEN_SESSION_ERROR:
+				cli->isInSession = false;
+				print("%s%s\n", MSG_FROM_SERVER, "Error opening session ")
+				break;
+			case CLOSE_SESSION_ERROR:
+				print("%s%s\n", MSG_FROM_SERVERSERVER, "You are not in session");
+				cli->isInSession=false;
+				break;
 		}
 	}
 }
@@ -251,6 +259,7 @@ void disconnectFromServer(Client* cli) {
 
 	if(cli->isInSession == true) {
 		clearPartner(cli);
+		closeSession(cli);
 		cli->isInSession = false;
 	}
 
