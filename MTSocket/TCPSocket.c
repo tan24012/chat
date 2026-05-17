@@ -88,17 +88,7 @@ TCPSocket* listenAndAccept(TCPSocket* s){
 	if (connect_sock_fd < 0) {
         return NULL;
     }
-/*
-    char ip[INET_ADDRSTRLEN];
-    inet_ntop(AF_INET,
-            &s->peerAddr.sin_addr,
-            ip,
-            sizeof(ip));
-
-    printf("Client: %s:%d\n",
-       ip,
-       ntohs(s->peerAddr.sin_port));
-*/
+    
 	TCPSocket* sockRt = (TCPSocket*)malloc(sizeof(TCPSocket));
     sockRt->sockFd = connect_sock_fd;
     sockRt->peerAddr = s->peerAddr;
