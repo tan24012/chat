@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <stdbool.h>
+#include <stdatomic.h>
 
 #include "MThread.h"
 #include "TCPSocket.h"
@@ -16,12 +17,13 @@ typedef struct
 } Partner;
 
 typedef struct{
+    pthread_mutex_t partner_mutex;
     TCPSocket* client_sock;
     char* client_name;
-    bool connectionStatus;  // đã connect đến server thành công chưa 
-    bool isLoggedIn;    // đã login chưa
-    bool isInSession;   // đang trong session với user nào đó chưa
-    bool shouldExit;
+    atomic_bool connectionStatus;  // đã connect đến server thành công chưa 
+    atomic_bool isLoggedIn;    // đã login chưa
+    atomic_bool isInSession;   // đang trong session với user nào đó chưa
+    atomic_bool shouldExit;
     MThread* mthread;
     Partner* partner;    // Thông tin đối tác trong session
     Peer2Peer* peer;    // socket dùng để chat trong session

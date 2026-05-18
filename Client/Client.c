@@ -31,6 +31,7 @@ void initClient(Client* cli) {
     cli->mthread = (MThread*)malloc(sizeof(MThread));	// lý do cấp phát (làm cái gì và các hàm nào lưu thông tin vào cho struct đó, nếu ko cấp phát vùng nhớ thì truy cập vào các member sẽ ko hợp lệ --> segmentation default)
 	cli->partner = (Partner*)malloc(sizeof(Partner));
 	cli->peer = (Peer2Peer*)malloc(sizeof(Peer2Peer));
+	pthread_mutex_init(&cli->partner_mutex, NULL);
 }
 
 void run_client(void* arg) {
@@ -144,14 +145,25 @@ void getUsers(Client* cli) {
 	writeCommand(cli->client_sock, GET_ALL_USERS);
 }
 
-clearPartner(Client* cli) {
-	free(cli->partner->name);
-	cli->partner->name = NULL;
-	free(cli->partner->ip);
-	cli->partner->ip = NULL;
-	cli->partner->port = 0;
-	cli->isInSession = false;
-	printf("Clear Partner\n");
+void clearPartner(Client* cli) {
+    if (cli == NULL || cli->partner == NULL) {
+        return;
+    }
+
+    pthread_mutex_lock(&cli->partner_mutex);
+
+    free(cli->partner->name);
+    cli->partner->name = NULL;
+
+    free(cli->partner->ip);
+    cli->partner->ip = NULL;
+
+    cli->partner->port = 0;
+    cli->isInSession = false;
+
+    pthread_mutex_unlock(&cli->partner_mutex);
+
+    printf("Clear Partner\n");
 }
 
 void gotIpAndPort(Client* cli) {
@@ -159,58 +171,101 @@ void gotIpAndPort(Client* cli) {
 		return;
 	}
 	char* msg;
-	char* name;
-	char *port;
-	char *token;
+    char* name;
+    char* token;
+    char* ip = NULL;
+    int port = 0;
 
 	name = readMsg(cli->client_sock);	// userName của user muốn chat trong session
 	msg = readMsg(cli->client_sock); 	// ip & port của user muốn chat trong session
 
-	cli->partner->name = name;
+	if (name == NULL || msg == NULL) {
+        return;
+    }
 	
 	token = strtok(msg, ":");
 	if(token != NULL) {
-		cli->partner->ip = strdup(token);
+		ip = strdup(token);
 	}
 
 	token = strtok(NULL, ":");
 	if(token != NULL) {
-		cli->partner->port = atoi(token);
+		port = atoi(token);
 	}
 
-	free(msg);
+	if (ip == NULL || port == 0) {
+        free(name);
+        free(ip);
+        free(msg);
+        return;
+    }
 
-	printf("You are now in session with -> %s - %s:%d\n", cli->partner->name, cli->partner->ip, cli->partner->port);
-	cli->isInSession = true;
+	pthread_mutex_lock(&cli->partner_mutex);
+
+    cli->partner->name = name;
+    cli->partner->ip = ip;
+    cli->partner->port = port;
+    cli->isInSession = true;
+
+    pthread_mutex_unlock(&cli->partner_mutex);
+
+    printf("You are now in session with -> %s - %s:%d\n", name, ip, port);
+
+    free(msg);
 }
 
 void gotIncomingSession(Client* cli) {
-	if (cli == NULL || cli->partner == NULL || cli->client_sock == NULL) {
-		return;
-	}
-	char *msg, *name;
-	char *port;
-	char *token;
+    if (cli == NULL || cli->partner == NULL || cli->client_sock == NULL) {
+        return;
+    }
 
-	name = readMsg(cli->client_sock);	// userName của user muốn chat trong session
-	msg = readMsg(cli->client_sock); 	// ip & port của user muốn chat trong session
+    char *msg = NULL;
+    char *name = NULL;
+    char *token = NULL;
+    char *ip = NULL;
+    int port = 0;
 
-	cli->partner->name = name;
+    name = readMsg(cli->client_sock);
+    msg = readMsg(cli->client_sock);
 
-	token = strtok(msg, ":");
-	if(token != NULL) {
-		cli->partner->ip = strdup(token);
-	}
+    if (name == NULL || msg == NULL) {
+        free(name);
+        free(msg);
+        return;
+    }
 
-	token = strtok(NULL, ":");
-	if(token != NULL) {
-		cli->partner->port = atoi(token);
-	}
+    token = strtok(msg, ":");
+    if (token != NULL) {
+        ip = strdup(token);
+    }
 
-	free(msg);
+    token = strtok(NULL, ":");
+    if (token != NULL) {
+        port = atoi(token);
+    }
 
-	printf("You are now in session with -> %s - %s:%d\n", cli->partner->name, cli->partner->ip, cli->partner->port);
-	cli->isInSession = true;
+    if (ip == NULL || port == 0) {
+        free(name);
+        free(ip);
+        free(msg);
+        return;
+    }
+
+    pthread_mutex_lock(&cli->partner_mutex);
+
+    cli->partner->name = name;
+    cli->partner->ip = ip;
+    cli->partner->port = port;
+    cli->isInSession = true;
+
+    printf("You are now in session with -> %s - %s:%d\n",
+           cli->partner->name,
+           cli->partner->ip,
+           cli->partner->port);
+
+    pthread_mutex_unlock(&cli->partner_mutex);
+
+    free(msg);
 }
 
 void closeSession(Client* cli) {
@@ -218,32 +273,66 @@ void closeSession(Client* cli) {
 	printf("session has ended\n");
 }
 
-void loggedIn(Client* cli) {	
-	if (cli == NULL || cli->client_sock == NULL || cli->peer == NULL) {
+void loggedIn(Client* cli) {
+    if (cli == NULL || cli->client_sock == NULL || cli->peer == NULL) {
         return;
     }
-	char *msg, *name;
-	int int_port;
-	char *token;
 
-	cli->client_name = readMsg(cli->client_sock);	
-	msg = readMsg(cli->client_sock); 	
-	token = strtok(msg, ":");
-	token = strtok(NULL, ":");
-	int_port = atoi(token);
-	free(msg);
+    char *msg = NULL;
+    char *name = NULL;
+    char *token = NULL;
+    int int_port = 0;
 
-	cli->isLoggedIn = true;
-	initPeer2Peer(cli->peer, int_port);
+    name = readMsg(cli->client_sock);
+    msg = readMsg(cli->client_sock);
+
+    if (name == NULL || msg == NULL) {
+        return;
+    }
+
+    token = strtok(msg, ":");
+    token = strtok(NULL, ":");
+    if (token == NULL) {
+        free(name);
+        free(msg);
+        return;
+    }
+
+    int_port = atoi(token);
+    if (int_port <= 0) {
+        free(name);
+        free(msg);
+        return;
+    }
+
+    cli->client_name = name;
+    cli->isLoggedIn = true;
+
+    free(msg);
+
+    initPeer2Peer(cli->peer, int_port);
 }
 
 void sendMsgToSession(Client* cli, char* msg) {
 	if(cli == NULL || msg == NULL || cli->partner->ip == NULL || cli->client_name == NULL) return;
+
+	char ip[16];
+    char name[100];
+    int port = 0;
+    Peer2Peer* peer = NULL;
+
+	pthread_mutex_lock(&cli->partner_mutex);
+
+	strncpy(ip, cli->partner->ip, sizeof(ip));
+	strncpy(name, cli->client_name, sizeof(name));
+	port = cli->partner->port;
+
+	pthread_mutex_unlock(&cli->partner_mutex);
 	 
 	if (cli->isInSession == true) {
 		char buffer[1024];
 		snprintf(buffer, sizeof(buffer), "[%s] %s", cli->client_name, msg);
-		sendTo_udp(cli->peer, buffer, cli->partner->ip, cli->partner->port);
+		sendTo_udp(cli->peer, buffer, ip, port);
 	}
 	else {
 		printf("You don't have an open session\n"); 
@@ -284,8 +373,14 @@ void closeApp(Client* cli, int exitCode) {
 
 	free(cli->mthread);
 	cli->mthread = NULL;
+
+	pthread_mutex_lock(&cli->partner_mutex);
+
 	free(cli->partner);
 	cli->partner = NULL;
+
+	pthread_mutex_unlock(&cli->partner_mutex);
+
 	free(cli->peer);
 	cli->peer = NULL;
 }
