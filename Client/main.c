@@ -19,7 +19,7 @@ int main(int argc, char* argv[]) {
     do {
         scanf("%s", command);
 
-        if(strcmp(command, "c") == 0) {
+        if(strcmp(command, "c") == 0 && cli.shouldExit == false) {
             if(cli.connectionStatus == false) {
                 if (!connectToServer(&cli, SERVER_IP, SERVER_PORT))
                     printf("connect failed\n");
@@ -29,7 +29,7 @@ int main(int argc, char* argv[]) {
             else
                 printf("Connected. Don't need to connect!\n");
         }
-        else if(strcmp(command, "login") == 0) {
+        else if(strcmp(command, "login") == 0 && cli.shouldExit == false) {
             printf("enter username: ");
             scanf("%s", username);
             printf("enter password: ");
@@ -46,7 +46,7 @@ int main(int argc, char* argv[]) {
 			else
 				printf("you are already logged in\n");
         }
-        else if (strcmp(command, "register") == 0)  {
+        else if (strcmp(command, "register") == 0 && cli.shouldExit == false)  {
             printf("enter username: ");
             scanf("%s", username);
             printf("enter password: ");
@@ -59,7 +59,7 @@ int main(int argc, char* argv[]) {
 			
 			signup(&cli, username, password);
 		}
-        else if (strcmp(command, "o") == 0) {
+        else if (strcmp(command, "o") == 0 && cli.shouldExit == false) {
 			printf("enter peer name: ");
             scanf("%s", peerUsr);
 
@@ -75,7 +75,7 @@ int main(int argc, char* argv[]) {
 				openSession(&cli, username, peerUsr);
 			}
 		}
-        else if (strcmp(command, "cs") == 0) 
+        else if (strcmp(command, "cs") == 0 && cli.shouldExit == false) 
 		{
 			if (cli.connectionStatus == false) {
 				printf("ERROR - You are not connected to a server\n");
@@ -87,7 +87,7 @@ int main(int argc, char* argv[]) {
 			}
 			closeSession(&cli);
 		}
-        else if (strcmp(command, "s") == 0) 
+        else if (strcmp(command, "s") == 0 && cli.shouldExit == false) 
 		{
 			if (cli.connectionStatus == false) {
 				printf("ERROR - You are not connected to a server\n");
@@ -107,7 +107,7 @@ int main(int argc, char* argv[]) {
 			else
 				printf("error\n");
 		}
-		else if (strcmp(command, "d") == 0) //disconnect from server
+		else if (strcmp(command, "d") == 0 && cli.shouldExit == false) //disconnect from server
 		{
 			if (cli.connectionStatus == false)
 			{
@@ -115,11 +115,19 @@ int main(int argc, char* argv[]) {
 				continue;
 			}
 			printf("Disconnecting Server...\n");
-			disconnectFromServer(&cli);
+			disconnectFromServer(&cli, 1);
 		}
-		else if (strcmp(command, "x") == 0) //disconnect from server
+		else if (strcmp(command, "x") == 0 || cli.shouldExit == true) //disconnect from server
 		{
-			closeApp(&cli);
+			if(cli.connectionStatus == true) {
+				printf("Server closed\n");
+				closeApp(&cli, 0);
+			}
+			else {
+				printf("App closed\n");
+				closeApp(&cli, 1);
+				break;
+			}
 		}
     } while(strcmp(command, "x") != 0);
 

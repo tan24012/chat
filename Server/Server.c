@@ -6,7 +6,7 @@ void initServer(Server* serv) {
 	
 	serv->mthread = (MThread*)malloc(sizeof(MThread));
     serv->listen_sock = NULL;
-    serv->status = false;
+    atomic_store(&serv->status, false);
 
     serv->mthread->run = runServer;
     serv->mthread->arg = serv;
@@ -15,14 +15,17 @@ void initServer(Server* serv) {
 }
 
 void runServer(void* arg) {
+    if(arg == NULL) return;
+
     Server* serv = (Server*)arg;
 
-    serv->status = true;
+    atomic_store(&serv->status, true);
 	serv->listen_sock = tcp_server_create(SERVER_PORT);
+    if(serv->listen_sock == NULL) return;
 	sleep(2);
 	printf("Server is listening on port %d\n", SERVER_PORT);
 
-	while (serv->status == true)
+	while (atomic_load(&serv->status) == true)
 	{
 
 		TCPSocket* temp_sock = listenAndAccept(serv->listen_sock);
@@ -43,7 +46,7 @@ void closeServer(Server* serv) {
         return;
     }
 
-    serv->status = false;
+    atomic_store(&serv->status, false);
 
     if (serv->listen_sock != NULL) {
         shutdown(serv->listen_sock->sockFd, SHUT_RDWR);
@@ -55,12 +58,19 @@ void closeServer(Server* serv) {
     }
 
     closeLoginAndSignUp(serv->loginAndSign);
-    free(serv->loginAndSign);
-    serv->loginAndSign = NULL;
 
-    free(serv->listen_sock);
-    serv->listen_sock = NULL;
-
-    free(serv->mthread);
-    serv->mthread = NULL;
+    if(serv->loginAndSign != NULL) {
+        free(serv->loginAndSign);
+        serv->loginAndSign = NULL;
+    }
+    
+    if(serv->listen_sock != NULL) {
+        free(serv->listen_sock);
+        serv->listen_sock = NULL;
+    }
+    
+    if(serv->mthread != NULL) {
+        free(serv->mthread);
+        serv->mthread = NULL;
+    }
 }

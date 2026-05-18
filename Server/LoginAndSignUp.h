@@ -18,7 +18,7 @@ typedef struct {
     Dispatcher* dispatcher;  // dispatcher để xử lý các request sau khi login/sign-up thành công
     int peers_count;    // số lượng TCPSocket trong mảng peers
     MThread* mthread;   // thread để xử lý login/sign-up
-    bool status;    // dừng/tiếp tục thread
+    atomic_bool  status;    // dừng/tiếp tục thread
 } LoginAndSignUp;
 
 void initLoginAndSignUp(LoginAndSignUp* loginAndSign);   // Khởi tạo LoginAndSignUp

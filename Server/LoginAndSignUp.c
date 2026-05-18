@@ -8,22 +8,26 @@ void initLoginAndSignUp(LoginAndSignUp* loginAndSign) {
 	initDispatcher(loginAndSign->dispatcher);
 
     loginAndSign->peers_count = 0;
-    loginAndSign->status = false;
+    atomic_store(&loginAndSign->status, false);
 	pthread_mutex_init(&loginAndSign->peers_mutex, NULL);
 }
 
 void addPeer(LoginAndSignUp* loginAndSign, TCPSocket* peer) {
+	if(peer == NULL || loginAndSign == NULL) return;
+
 	pthread_mutex_lock(&loginAndSign->peers_mutex);
+
     if (loginAndSign->peers_count < MAX_PEERS) {
         loginAndSign->peers[loginAndSign->peers_count] = peer;
         loginAndSign->peers_count++;
     } else {
         printf("Maximum number of peers reached. Cannot add more.\n");
     }
+
 	pthread_mutex_unlock(&loginAndSign->peers_mutex)
 
-    if(loginAndSign->status == false) {
-        loginAndSign->status = true;
+    if(atomic_load(&loginAndSign->status) == false) {
+        atomic_store(&loginAndSign->status, true);
         loginAndSign->mthread->run = runLoginAndSignUp;
         loginAndSign->mthread->arg = (void*)loginAndSign;
 		mt_start(loginAndSign->mthread);
@@ -31,7 +35,9 @@ void addPeer(LoginAndSignUp* loginAndSign, TCPSocket* peer) {
 }
 
 bool login(Dispatcher* dispatcher, char* username, char* password) {
-	FILE* f = fopen("/home/hoangtan/duytan/chat/Server/users.txt", "r");
+	if(dispatcher == NULL || username == NULL || password == NULL) return false;
+
+	FILE* f = fopen("../Server/users.txt", "r");
 	if (f == NULL || username == NULL || password == NULL) {
 		printf("Error opening users.txt in login\n");
 		return false;
@@ -59,8 +65,9 @@ bool login(Dispatcher* dispatcher, char* username, char* password) {
 	return false;
 }
 
-bool signup(Dispatcher* dispatcher, char* username, char* password)
-{
+bool signup(Dispatcher* dispatcher, char* username, char* password) {
+	if(dispatcher == NULL || username == NULL || password == NULL) return false;
+
 	FILE* f = fopen("../Server/users.txt", "r");
 	if (f == NULL) {
 		printf("Error opening users.txt in sign up\n");
@@ -82,7 +89,7 @@ bool signup(Dispatcher* dispatcher, char* username, char* password)
 		return false;
 	}
 
-	f = fopen("/home/hoangtan/duytan/chat/Server/users.txt", "a");
+	f = fopen("../Server/users.txt", "a");
 	if (f == NULL) {
 		printf("Error opening users.txt in sign up write\n");
 		return false;
@@ -94,7 +101,9 @@ bool signup(Dispatcher* dispatcher, char* username, char* password)
 }
 
 void remove_peer(LoginAndSignUp* loginAndSign, TCPSocket* peer) {
+	if(peer == NULL || loginAndSign == NULL) return;
 	pthread_mutex_lock(&loginAndSign->peers_mutex);
+
     int index = -1;
 
     for (int i = 0; i < loginAndSign->peers_count; i++) {
@@ -114,11 +123,14 @@ void remove_peer(LoginAndSignUp* loginAndSign, TCPSocket* peer) {
 
     loginAndSign->peers_count--;
     loginAndSign->peers[loginAndSign->peers_count] = NULL;
+
 	pthread_mutex_unlock(&loginAndSign->peers_mutex)
 }
 
 void runLoginAndSignUp(void* arg) {
-	printf("Run Login and Sign-up thread\n");
+	if(arg == NULL) return;
+	printf("Login and Sign-up thread is Running ...\n");
+
     LoginAndSignUp* loginAndSign = (LoginAndSignUp*)arg;
 	
     int command;
@@ -126,10 +138,11 @@ void runLoginAndSignUp(void* arg) {
 	char* password;
 	char* ipAndPort;
 
-    while(loginAndSign->status == true) {
+    while(atomic_load(&loginAndSign->status) == true) {
         TCPSocket* sockfd_ready;
 
-        MultipleTCPSocketsListener* listener = (MultipleTCPSocketsListener*)malloc(sizeof(MultipleTCPSocketsListener));
+        MultipleTCPSocketsListener* listener = (MultipleTCPSocketsListener*)malloc(sizeof(MultipleTCPSocketsListener));	// nếu add thêm thì ko ảnh hưởng
+		
 		pthread_mutex_lock(&loginAndSign->peers_mutex);
 		memcpy(listener->sockets, loginAndSign->peers, loginAndSign->peers_count * sizeof(TCPSocket*));	 // copy pointer
 		pthread_mutex_unlock(&loginAndSign->peers_mutex)
@@ -199,60 +212,51 @@ void runLoginAndSignUp(void* arg) {
     }
 }
 
-void notifyPendingClients(LoginAndSignUp* loginAndSign) {
-    if (loginAndSign == NULL) {
-        return;
-    }
-
-    pthread_mutex_lock(&loginAndSign->peers_mutex);
-
-    for (int i = 0; i < loginAndSign->peers_count; i++) {
-        TCPSocket* peer = loginAndSign->peers[i];
-
-        if (peer != NULL) {
-            writeCommand(peer, CLOSE_CONNECTION);
-        }
-    }
-
-    pthread_mutex_unlock(&loginAndSign->peers_mutex);
-}
-
 void closeLoginAndSignUp(LoginAndSignUp* loginAndSign) {
     if (loginAndSign == NULL) {
         return;
     }
 
-	notifyPendingClients(loginAndSign);
+    atomic_store(&loginAndSign->status, false);
 
-    loginAndSign->status = false;
+	pthread_mutex_lock(&loginAndSign->peers_mutex);
 
-	pthread_mutex_lock(&loginAndSign->mutex);
     for (int i = 0; i < loginAndSign->peers_count; i++) {
         TCPSocket* peer = loginAndSign->peers[i];
 
         if (peer != NULL) {
+			writeCommand(peer, CLOSE_CONNECTION);
             shutdown(peer->sockFd, SHUT_RDWR);
             close(peer->sockFd);
         }
     }
 
-    if (loginAndSign->mthread != NULL && loginAndSign->status == true) {
+	pthread_mutex_unlock(&loginAndSign->peers_mutex);
+
+    if (loginAndSign->mthread != NULL) {
         mt_wait(loginAndSign->mthread);
     }
+
+	pthread_mutex_lock(&loginAndSign->peers_mutex);
 
     for (int i = 0; i < loginAndSign->peers_count; i++) {
         free(loginAndSign->peers[i]);
         loginAndSign->peers[i] = NULL;
     }
-	pthread_mutex_unlock(&loginAndSign->mutex);
+	loginAndSign->peers_count = 0;
 
-    loginAndSign->peers_count = 0;
+	pthread_mutex_unlock(&loginAndSign->peers_mutex);
 
-    closeDispatcher(loginAndSign->dispatcher);
-    free(loginAndSign->dispatcher);
-    loginAndSign->dispatcher = NULL;
+	if (loginAndSign->dispatcher != NULL) {
+		closeDispatcher(loginAndSign->dispatcher);
+		free(loginAndSign->dispatcher);
+		loginAndSign->dispatcher = NULL;
+	}
 
-    free(loginAndSign->mthread);
-    loginAndSign->mthread = NULL;
+	if (loginAndSign->mthread != NULL) {
+		free(loginAndSign->mthread);
+		loginAndSign->mthread = NULL;
+	}
+
 	pthread_mutex_destroy(&loginAndSign->peers_mutex);
 }

@@ -27,6 +27,7 @@ void initClient(Client* cli) {
     cli->connectionStatus = false;
     cli->isLoggedIn = false;
     cli->isInSession = false;
+	cli->shouldExit = false;
     cli->mthread = (MThread*)malloc(sizeof(MThread));	// lý do cấp phát (làm cái gì và các hàm nào lưu thông tin vào cho struct đó, nếu ko cấp phát vùng nhớ thì truy cập vào các member sẽ ko hợp lệ --> segmentation default)
 	cli->partner = (Partner*)malloc(sizeof(Partner));
 	cli->peer = (Peer2Peer*)malloc(sizeof(Peer2Peer));
@@ -82,12 +83,16 @@ void run_client(void* arg) {
 				print("%s%s\n", MSG_FROM_SERVERSERVER, "You are not in session");
 				cli->isInSession=false;
 				break;
+			case CLOSE_CONNECTION:
+				print("%s%s\n", MSG_FROM_SERVERSERVER, "Server was closed");
+				cli->shouldExit=true;
+				break;
 		}
 	}
 }
 
 bool connectToServer(Client* cli, char* serverIp, int serverPort) {
-    if (cli == NULL || cli->mthread == NULL) {
+    if (cli == NULL || cli->mthread == NULL || serverIp == NULL) {
         return false;
     }
     cli->client_sock = tcp_clent_create(serverIp, serverPort);
@@ -245,44 +250,37 @@ void sendMsgToSession(Client* cli, char* msg) {
 	}
 }
 
-void disconnectFromServer(Client* cli) {
+void disconnectFromServer(Client* cli, int exitCode) {
 	if(cli == NULL || cli->client_sock == NULL) return;
 
 	if(cli->isLoggedIn == true) {
 		free(cli->client_name);
 		cli->client_name = NULL;
-
-		cclosePeer(cli->peer);	// đóng peer
-
-		cli->isLoggedIn == false;
+		cli->isLoggedIn = false;
 	}
 
 	if(cli->isInSession == true) {
-		clearPartner(cli);
-		closeSession(cli);
 		cli->isInSession = false;
+		clearPartner(cli);
+		cclosePeer(cli->peer);	// đóng peer
 	}
 
 	cli->connectionStatus = false;	// dừng thread
-	writeCommand(cli->client_sock, EXIT);
+	if(exitCode == 1) {	// client chủ động
+		writeCommand(cli->client_sock, EXIT);
+	}
 	cclose(cli->client_sock);
 	mt_wait(cli->mthread);		
 	free(cli->client_sock);
 	cli->client_sock = NULL;
 }
 
-void closeApp(Client* cli) {
+void closeApp(Client* cli, int exitCode) {
 	if (cli == NULL) return;
 	
 	if(cli->connectionStatus == true) {
-		disconnectFromServer(cli);
+		disconnectFromServer(cli, exitCode);
 	}
-	else {
-        cli->connectionStatus = false;
-        if (cli->mthread != NULL) {
-            mt_wait(cli->mthread);
-        }
-    }
 
 	free(cli->mthread);
 	cli->mthread = NULL;

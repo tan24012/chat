@@ -21,6 +21,7 @@ typedef struct{
     bool connectionStatus;  // đã connect đến server thành công chưa 
     bool isLoggedIn;    // đã login chưa
     bool isInSession;   // đang trong session với user nào đó chưa
+    bool shouldExit;
     MThread* mthread;
     Partner* partner;    // Thông tin đối tác trong session
     Peer2Peer* peer;    // socket dùng để chat trong session
@@ -41,7 +42,7 @@ void gotIncomingSession(Client* cli); // nhận tên, ip & port từ server khi 
 void clearPartner(Client* cli); // xóa thông tin partner 
 void loggedIn(Client* cli);
 void sendMsgToSession(Client* cli, char* msg);
-void disconnectFromServer(Client* cli);
+void disconnectFromServer(Client* cli, int exitCode);
 void closeApp(Client* cli);
 
 #endif

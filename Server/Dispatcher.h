@@ -17,7 +17,7 @@ typedef struct {
 	char* all_users[MAX_PEERS];     // mảng user name đã đăng ký
     int all_users_count;
     MThread* mthread;
-    bool status;
+    atomic_bool status;
 } Dispatcher;
 
 void initDispatcher(Dispatcher* dispatcher);

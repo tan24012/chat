@@ -2,7 +2,7 @@
 #include "Protocol.h"
 
 void initDispatcher(Dispatcher* dispatcher) {
-	dispatcher->status = false;
+	atomic_store(&dispatcher->status, false);
     dispatcher->all_users_count = 0;
 	dispatcher->login_users_count = 0;
 	dispatcher->login_users_sockets_count = 0;
@@ -29,17 +29,25 @@ void getAllUsers(Dispatcher* dispatcher) {
 }
 
 bool checkLogined(Dispatcher* dispatcher, char* userName) {
+	if(dispatcher == NULL || userName == NULL) return false;
+
 	pthread_mutex_lock(&dispatcher->login_dispatcher_mutex);
+
     for(int i=0; i<dispatcher->login_users_count; i++) {
         if(strcmp(dispatcher->login_users[i]->name, userName) == 0) {
+            pthread_mutex_unlock(&dispatcher->login_dispatcher_mutex);
             return true;
         }
     }
+
 	pthread_mutex_unlock(&dispatcher->login_dispatcher_mutex);
+
     return false;
 }
 
 void add_user(Dispatcher* dispatcher, TCPSocket* sockfd, const char* username) {
+	if(dispatcher == NULL || sockfd == NULL || username == NULL) return;
+
 	pthread_mutex_lock(&dispatcher->login_dispatcher_mutex);
 
 	User* user = (User*)malloc(sizeof(User));
@@ -54,24 +62,31 @@ void add_user(Dispatcher* dispatcher, TCPSocket* sockfd, const char* username) {
 	dispatcher->login_users_sockets[dispatcher->login_users_sockets_count] = sockfd;
 	dispatcher->login_users_sockets_count++;
 
-	if (dispatcher->status == false)
+	if (atomic_load(&dispatcher->status) == false)
 	{
-		dispatcher->status = true;
+		atomic_store(&dispatcher->status, true);
 		dispatcher->mthread->run = runDispatcher;
 		dispatcher->mthread->arg = (void*)dispatcher;
 		mt_start(dispatcher->mthread);
 	}
+
 	pthread_mutex_unlock(&dispatcher->login_dispatcher_mutex);
 }
 
 void add_all_users(Dispatcher* dispatcher, const char* username) {
+	if(dispatcher == NULL || username == NULL) return;
+
 	pthread_mutex_lock(&dispatcher->login_dispatcher_mutex);
+
 	dispatcher->all_users[dispatcher->all_users_count] = username;
 	dispatcher->all_users_count++;
+
 	pthread_mutex_unlock(&dispatcher->login_dispatcher_mutex);
 }
 
 void open_session(Dispatcher* dispatcher, User* user) {
+	if(dispatcher == NULL || user == NULL) return;
+
 	char *userName, *peerUsr, *user_ip_and_port, *target_ip_and_port;
 	User* target = NULL;
 	User* _user = NULL;
@@ -80,6 +95,7 @@ void open_session(Dispatcher* dispatcher, User* user) {
 	peerUsr = readMsg(user->socket);	// userName của client đích
 
 	pthread_mutex_lock(&dispatcher->login_dispatcher_mutex);
+
 	for (int i=0; i<dispatcher->login_users_count; i++) {	// tìm User muốn mở sesion coi đã login chưa
 		if (user->socket == dispatcher->login_users[i]->socket) {
 			_user = dispatcher->login_users[i];
@@ -169,10 +185,13 @@ void close_session(Dispatcher* dispatcher,  User* user)
 		writeCommand(_user->socket,CLOSE_SESSION_ERROR);
 	}
 	pthread_mutex_unlock(&dispatcher->login_dispatcher_mutex);
+
 	printf("close session: %s\n", _user->name);
 }
 
-void user_exit(User* current_user) {
+void user_exit(Dispatcher* dispatcher, User* current_user) {
+	if(dispatcher == NULL || current_user == NULL) return;
+
 	User* user;
 	TCPSocket* login_sock;
 	int index = -1;
@@ -217,15 +236,16 @@ void user_exit(User* current_user) {
 }
 
 void runDispatcher(void* arg) {
+	if(arg == NULL) return;
 	printf("Dispatcher is running...\n");
 
 	Dispatcher* dispatcher = (Dispatcher*)arg;
 
 	int command;
 
-	while (dispatcher->status == true)
-	{
+	while (atomic_load(&dispatcher->status) == true) {
         MultipleTCPSocketsListener* listener = (MultipleTCPSocketsListener*)malloc(sizeof(MultipleTCPSocketsListener));
+		
 		pthread_mutex_lock(&dispatcher->login_dispatcher_mutex);
 		memcpy(listener->sockets, dispatcher->login_users_sockets, dispatcher->login_users_sockets_count * sizeof(TCPSocket*));
 		pthread_mutex_unlock(&dispatcher->login_dispatcher_mutex);
@@ -252,7 +272,7 @@ void runDispatcher(void* arg) {
 			close_session(dispatcher, current_user);
 		}
 		else if (command == EXIT)  {
-			user_exit(current_user);
+			user_exit(dispatcher, current_user);
 		}
 		// else if (command == GET_ALL_USERS) //all names from file
 		// {
@@ -265,32 +285,14 @@ void runDispatcher(void* arg) {
 	}
 }
 
-void notifyDispatcherClients(Dispatcher* dispatcher) {
-    if (dispatcher == NULL) {
-        return;
-    }
-
-    pthread_mutex_lock(&dispatcher->login_dispatcher_mutex);
-
-    for (int i = 0; i < dispatcher->login_users_count; i++) {
-        User* user = dispatcher->login_users[i];
-
-        if (user != NULL && user->socket != NULL) {
-            writeCommand(user->socket, CLOSE_CONNECTION);
-        }
-    }
-
-    pthread_mutex_unlock(&dispatcher->login_dispatcher_mutex);
-}
-
 void closeDispatcher(Dispatcher* dispatcher) {
     if (dispatcher == NULL) {
         return;
     }
 
-	notifyDispatcherClients(dispatcher);
+    atomic_store(&dispatcher->status, false);
 
-    dispatcher->status = false;
+	pthread_mutex_lock(&dispatcher->login_dispatcher_mutex);
 
     for (int i = 0; i < dispatcher->login_users_count; i++) {
         User* user = dispatcher->login_users[i];
@@ -302,9 +304,13 @@ void closeDispatcher(Dispatcher* dispatcher) {
         }
     }
 
+	pthread_mutex_destroy(&dispatcher->login_dispatcher_mutex);
+
     if (dispatcher->mthread != NULL) {
         mt_wait(dispatcher->mthread);
     }
+
+	pthread_mutex_lock(&dispatcher->login_dispatcher_mutex);
 
     for (int i = 0; i < dispatcher->login_users_count; i++) {
         User* user = dispatcher->login_users[i];
@@ -325,11 +331,15 @@ void closeDispatcher(Dispatcher* dispatcher) {
         dispatcher->login_users_sockets[i] = NULL;
     }
 
+	pthread_mutex_unlock(&dispatcher->login_dispatcher_mutex);
+
     dispatcher->login_users_count = 0;
     dispatcher->login_users_sockets_count = 0;
 
     pthread_mutex_destroy(&dispatcher->login_dispatcher_mutex);
 
-    free(dispatcher->mthread);
-    dispatcher->mthread = NULL;
+	if(dispatcher->mthread != NULL) {
+		free(dispatcher->mthread);
+		dispatcher->mthread = NULL;
+	}
 }
