@@ -45,6 +45,6 @@ void clearPartner(Client* cli); // xóa thông tin partner
 void loggedIn(Client* cli);
 void sendMsgToSession(Client* cli, char* msg);
 void disconnectFromServer(Client* cli, int exitCode);
-void closeApp(Client* cli);
+void closeApp(Client* cli, int exitCode);
 
 #endif

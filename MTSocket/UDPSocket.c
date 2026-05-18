@@ -15,7 +15,7 @@ UDPSocket* create_UDPSocket(int port){
 	udpSocket->socket_fd = socket (AF_INET, SOCK_DGRAM, 0);
 	if (udpSocket->socket_fd < 0) {
 		perror("socket");
-		return;
+		return NULL;
 	}
 	memset(&udpSocket->s_in, 0, sizeof(udpSocket->s_in));
 

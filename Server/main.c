@@ -2,9 +2,9 @@
 
 int main() {
     Server server ;
-
     initServer(&server);
 
+    char command[100];
     do {
         scanf("%s", command);
 

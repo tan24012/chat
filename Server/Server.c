@@ -5,6 +5,7 @@ void initServer(Server* serv) {
 	initLoginAndSignUp(serv->loginAndSign);
 	
 	serv->mthread = (MThread*)malloc(sizeof(MThread));
+    mt_init(serv->mthread);
     serv->listen_sock = NULL;
     atomic_store(&serv->status, false);
 

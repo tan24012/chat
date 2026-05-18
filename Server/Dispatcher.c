@@ -7,6 +7,8 @@ void initDispatcher(Dispatcher* dispatcher) {
 	dispatcher->login_users_count = 0;
 	dispatcher->login_users_sockets_count = 0;
     dispatcher->mthread = (MThread*)malloc(sizeof(MThread));
+	mt_init(dispatcher->mthread);
+	
     getAllUsers(dispatcher);
     pthread_mutex_init(&dispatcher->login_dispatcher_mutex, NULL);
 }
@@ -53,7 +55,7 @@ void add_user(Dispatcher* dispatcher, TCPSocket* sockfd, const char* username) {
 	User* user = (User*)malloc(sizeof(User));
 
 	user->socket = sockfd;
-	user->name = username;
+	user->name = strdup(username);
 	user->connectionStatus = false;
 	user->connectedToUser = NULL;
 
@@ -138,6 +140,9 @@ void open_session(Dispatcher* dispatcher, User* user) {
 		printf("target name: %s\n", _user->connectedToUser->name);
 		printf("target_ip_and_port: %s\n", target_ip_and_port);
 		printf("user_ip_and_port: %s\n", user_ip_and_port);
+
+		free(target_ip_and_port);
+		free(user_ip_and_port);
 	}
 	else {
 		writeCommand(user->socket,OPEN_SESSION_ERROR);
@@ -225,13 +230,14 @@ void user_exit(Dispatcher* dispatcher, User* current_user) {
 	if(user->connectedToUser != NULL) {
 		user->connectedToUser->connectedToUser = NULL;
 		user->connectedToUser->connectionStatus = false;
-		writeCommand(user->connectedToUser->socket,SESSION_ENDED);
+		writeCommand(user->connectedToUser->socket, SESSION_ENDED);
 	}
 
 	pthread_mutex_unlock(&dispatcher->login_dispatcher_mutex);
 
 	cclose(user->socket);
 	free(user->socket);
+	free(user->name);
 	free(user);
 }
 
@@ -244,6 +250,7 @@ void runDispatcher(void* arg) {
 	int command;
 
 	while (atomic_load(&dispatcher->status) == true) {
+		User current_user;
         MultipleTCPSocketsListener* listener = (MultipleTCPSocketsListener*)malloc(sizeof(MultipleTCPSocketsListener));
 		
 		pthread_mutex_lock(&dispatcher->login_dispatcher_mutex);
@@ -254,25 +261,23 @@ void runDispatcher(void* arg) {
 		free(listener);
 
 		if (temp_sock != NULL) {
-			User* current_user = (User*)malloc(sizeof(User));
 			command = readCommand(temp_sock);
-			current_user->socket = temp_sock; 
+			current_user.socket = temp_sock; 
 		}
 		else 
 			continue;
 
 		if (command == 0) {
-			free(current_user);
 			continue;
 		}
 		else if (command == OPEN_SESSION_WITH_USER) {
-			open_session(dispatcher, current_user);
+			open_session(dispatcher, &current_user);
 		}
 		else if (command == CLOSE_SESSION_WITH_USER) {
-			close_session(dispatcher, current_user);
+			close_session(dispatcher, &current_user);
 		}
 		else if (command == EXIT)  {
-			user_exit(dispatcher, current_user);
+			user_exit(dispatcher, &current_user);
 		}
 		// else if (command == GET_ALL_USERS) //all names from file
 		// {
@@ -304,7 +309,7 @@ void closeDispatcher(Dispatcher* dispatcher) {
         }
     }
 
-	pthread_mutex_destroy(&dispatcher->login_dispatcher_mutex);
+	pthread_mutex_unlock(&dispatcher->login_dispatcher_mutex);
 
     if (dispatcher->mthread != NULL) {
         mt_wait(dispatcher->mthread);
@@ -329,6 +334,10 @@ void closeDispatcher(Dispatcher* dispatcher) {
 
     for (int i = 0; i < dispatcher->login_users_sockets_count; i++) {
         dispatcher->login_users_sockets[i] = NULL;
+    }
+
+	for (int i = 0; i < dispatcher->all_users_count; i++) {
+        free(dispatcher->all_users[i]);
     }
 
 	pthread_mutex_unlock(&dispatcher->login_dispatcher_mutex);

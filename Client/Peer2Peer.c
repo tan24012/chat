@@ -1,9 +1,11 @@
 #include "Peer2Peer.h"
+#include <stdlib.h>
 
 void initPeer2Peer(Peer2Peer* peer, int _port) {
     peer->udp_socket = create_UDPSocket(_port);
 	peer->port = _port;
     peer->mthread = (MThread*)malloc(sizeof(MThread));
+	mt_init(peer->mthread);
 	peer->running = true;
 
     peer->mthread->run = runPeer2Peer;

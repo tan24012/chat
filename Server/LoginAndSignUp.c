@@ -2,6 +2,7 @@
 
 void initLoginAndSignUp(LoginAndSignUp* loginAndSign) {
     loginAndSign->mthread = (MThread*)malloc(sizeof(MThread));
+	mt_init(loginAndSign->mthread);
     memset(&loginAndSign->peers, 0, sizeof(loginAndSign->peers)); 
 
 	loginAndSign->dispatcher = (Dispatcher*)malloc(sizeof(Dispatcher));
@@ -24,7 +25,7 @@ void addPeer(LoginAndSignUp* loginAndSign, TCPSocket* peer) {
         printf("Maximum number of peers reached. Cannot add more.\n");
     }
 
-	pthread_mutex_unlock(&loginAndSign->peers_mutex)
+	pthread_mutex_unlock(&loginAndSign->peers_mutex);
 
     if(atomic_load(&loginAndSign->status) == false) {
         atomic_store(&loginAndSign->status, true);
@@ -124,7 +125,7 @@ void remove_peer(LoginAndSignUp* loginAndSign, TCPSocket* peer) {
     loginAndSign->peers_count--;
     loginAndSign->peers[loginAndSign->peers_count] = NULL;
 
-	pthread_mutex_unlock(&loginAndSign->peers_mutex)
+	pthread_mutex_unlock(&loginAndSign->peers_mutex);
 }
 
 void runLoginAndSignUp(void* arg) {
@@ -145,7 +146,7 @@ void runLoginAndSignUp(void* arg) {
 		
 		pthread_mutex_lock(&loginAndSign->peers_mutex);
 		memcpy(listener->sockets, loginAndSign->peers, loginAndSign->peers_count * sizeof(TCPSocket*));	 // copy pointer
-		pthread_mutex_unlock(&loginAndSign->peers_mutex)
+		pthread_mutex_unlock(&loginAndSign->peers_mutex);
 
         sockfd_ready = listenToSocket(listener, loginAndSign->peers_count, 2);
         free(listener);
@@ -157,13 +158,12 @@ void runLoginAndSignUp(void* arg) {
 			continue;
         
         if (command == 0) {
-			printf("error in ready peer");
 			continue;
 		}
 		else if (command == LOGIN) {
 			username = readMsg(sockfd_ready);
 			password = readMsg(sockfd_ready);
-			ipAndPort = destIpAndPort(sockfd_ready)
+			ipAndPort = destIpAndPort(sockfd_ready);
 
 			if  (login(loginAndSign->dispatcher, username, password) == true) {
 				writeCommand(sockfd_ready, CONFIRM_USER);
@@ -182,7 +182,7 @@ void runLoginAndSignUp(void* arg) {
 		else if (command == SIGNUP) {
 			username = readMsg(sockfd_ready);
 			password = readMsg(sockfd_ready);
-			ipAndPort = destIpAndPort(sockfd_ready)
+			ipAndPort = destIpAndPort(sockfd_ready);
 
 			if (signup(loginAndSign->dispatcher, username, password) == true) {
 				writeCommand(sockfd_ready,CONFIRM_USER);

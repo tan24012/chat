@@ -25,11 +25,12 @@ void print_instructions()
 void initClient(Client* cli) {
     cli->client_sock = NULL;	// lý do ko cấp phát
     cli->connectionStatus = false;
-    cli->isLoggedIn = false;
-    cli->isInSession = false;
-	cli->shouldExit = false;
+    atomic_store(&cli->isLoggedIn, false);
+    atomic_store(&cli->isInSession, false);
+	atomic_store(&cli->shouldExit, false);
     cli->mthread = (MThread*)malloc(sizeof(MThread));	// lý do cấp phát (làm cái gì và các hàm nào lưu thông tin vào cho struct đó, nếu ko cấp phát vùng nhớ thì truy cập vào các member sẽ ko hợp lệ --> segmentation default)
-	cli->partner = (Partner*)malloc(sizeof(Partner));
+	mt_init(cli->mthread);
+    cli->partner = (Partner*)malloc(sizeof(Partner));
 	cli->peer = (Peer2Peer*)malloc(sizeof(Peer2Peer));
 	pthread_mutex_init(&cli->partner_mutex, NULL);
 }
@@ -44,7 +45,7 @@ void run_client(void* arg) {
     printf("client running ...\n");
     int command;
 
-    while (cli->connectionStatus)
+    while(atomic_load(&cli->connectionStatus))
 	{
 		command = readCommand(cli->client_sock);
 
@@ -73,20 +74,20 @@ void run_client(void* arg) {
 				gotIncomingSession(cli);
 				break;
 			case SESSION_ENDED:
-				cli->isInSession = false;
+				atomic_store(&cli->isInSession, false);
 				clearPartner(cli);
 				break;
 			case OPEN_SESSION_ERROR:
-				cli->isInSession = false;
-				print("%s%s\n", MSG_FROM_SERVER, "Error opening session ")
+				atomic_store(&cli->isInSession, false);
+				printf("%s%s\n", MSG_FROM_SERVER, "Error opening session ");
 				break;
 			case CLOSE_SESSION_ERROR:
-				print("%s%s\n", MSG_FROM_SERVERSERVER, "You are not in session");
-				cli->isInSession=false;
+				printf("%s%s\n", MSG_FROM_SERVER, "You are not in session");
+				atomic_store(&cli->isInSession, false);
 				break;
 			case CLOSE_CONNECTION:
-				print("%s%s\n", MSG_FROM_SERVERSERVER, "Server was closed");
-				cli->shouldExit=true;
+				printf("%s%s\n", MSG_FROM_SERVER, "Server was closed");
+				atomic_store(&cli->shouldExit, true);
 				break;
 		}
 	}
@@ -102,7 +103,7 @@ bool connectToServer(Client* cli, char* serverIp, int serverPort) {
         return false;
     }
     else {
-        cli->connectionStatus = true;
+        atomic_store(&cli->connectionStatus, true);
         cli->mthread->run = run_client;
         cli->mthread->arg = (void*)cli;
         mt_start(cli->mthread);
@@ -159,7 +160,7 @@ void clearPartner(Client* cli) {
     cli->partner->ip = NULL;
 
     cli->partner->port = 0;
-    cli->isInSession = false;
+    atomic_store(&cli->isInSession, false);
 
     pthread_mutex_unlock(&cli->partner_mutex);
 
@@ -205,7 +206,7 @@ void gotIpAndPort(Client* cli) {
     cli->partner->name = name;
     cli->partner->ip = ip;
     cli->partner->port = port;
-    cli->isInSession = true;
+    atomic_store(&cli->isInSession, true);
 
     pthread_mutex_unlock(&cli->partner_mutex);
 
@@ -256,7 +257,7 @@ void gotIncomingSession(Client* cli) {
     cli->partner->name = name;
     cli->partner->ip = ip;
     cli->partner->port = port;
-    cli->isInSession = true;
+    atomic_store(&cli->isInSession, true);
 
     printf("You are now in session with -> %s - %s:%d\n",
            cli->partner->name,
@@ -306,7 +307,7 @@ void loggedIn(Client* cli) {
     }
 
     cli->client_name = name;
-    cli->isLoggedIn = true;
+    atomic_store(&cli->isLoggedIn, true);
 
     free(msg);
 
@@ -329,7 +330,7 @@ void sendMsgToSession(Client* cli, char* msg) {
 
 	pthread_mutex_unlock(&cli->partner_mutex);
 	 
-	if (cli->isInSession == true) {
+	if (atomic_load(&cli->isInSession)) {
 		char buffer[1024];
 		snprintf(buffer, sizeof(buffer), "[%s] %s", cli->client_name, msg);
 		sendTo_udp(cli->peer, buffer, ip, port);
@@ -342,19 +343,19 @@ void sendMsgToSession(Client* cli, char* msg) {
 void disconnectFromServer(Client* cli, int exitCode) {
 	if(cli == NULL || cli->client_sock == NULL) return;
 
-	if(cli->isLoggedIn == true) {
+	if(atomic_load(&cli->isLoggedIn)) {
 		free(cli->client_name);
 		cli->client_name = NULL;
-		cli->isLoggedIn = false;
+		atomic_store(&cli->isLoggedIn, false);
 	}
 
-	if(cli->isInSession == true) {
-		cli->isInSession = false;
+	if(atomic_load(&cli->isInSession)) {
+		atomic_store(&cli->isInSession, false);
 		clearPartner(cli);
 		cclosePeer(cli->peer);	// đóng peer
 	}
 
-	cli->connectionStatus = false;	// dừng thread
+	atomic_store(&cli->connectionStatus, false);	// dừng thread
 	if(exitCode == 1) {	// client chủ động
 		writeCommand(cli->client_sock, EXIT);
 	}
@@ -367,7 +368,7 @@ void disconnectFromServer(Client* cli, int exitCode) {
 void closeApp(Client* cli, int exitCode) {
 	if (cli == NULL) return;
 	
-	if(cli->connectionStatus == true) {
+	if(atomic_load(&cli->connectionStatus)) {
 		disconnectFromServer(cli, exitCode);
 	}
 

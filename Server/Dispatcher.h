@@ -3,6 +3,8 @@
 #ifndef DISPATCHER_H_
 #define DISPATCHER_H_
 
+#include <stdatomic.h>
+
 #include "User.h"
 #include "MThread.h"
 #include "Protocol.h"
